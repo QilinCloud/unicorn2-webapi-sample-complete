@@ -1,0 +1,529 @@
+openapi: 3.0.3
+info:
+  title: Unicorn 2 ApiWeb Connector
+  version: "2026-06-13"
+  description: >
+    Signed JSON envelope used by Unicorn 2 to call a partner-hosted ApiWeb PHP
+    endpoint. The complete sample implements the full marketplace surface; the
+    minimal sample implements orders, shipment confirmation, stock, price and
+    processing-time updates.
+servers:
+  - url: http://127.0.0.1:18080
+tags:
+  - name: Envelope
+  - name: Complete sample
+  - name: Minimal sample
+paths:
+  /api.php:
+    post:
+      tags:
+        - Envelope
+      summary: ApiWeb JSON envelope endpoint
+      description: >
+        Unicorn 2 always posts to one endpoint and selects the operation through
+        `X-Unicorn-Api-Method` and the `Method` field in the JSON body. Every
+        request and response is signed with HMAC-SHA256.
+      parameters:
+        - name: X-Unicorn-Signature-Version
+          in: header
+          required: true
+          schema:
+            type: string
+            example: 2026-06-13.hmac-sha256
+        - name: X-Unicorn-Api-Method
+          in: header
+          required: true
+          schema:
+            $ref: '#/components/schemas/ApiWebMethod'
+        - name: X-Unicorn-Timestamp
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Unicorn-Nonce
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Unicorn-Body-Sha256
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-Unicorn-Signature
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestEnvelope'
+            examples:
+              validateCredentials:
+                summary: Valid credentials
+                value:
+                  Source: unicorn2
+                  Method: validateCredentials
+                  LicenceKey: local-dev
+                  ShopId: 1
+                  CreatedAtUtc: "2026-06-13T10:00:00Z"
+                  Reference: null
+                  Objects:
+                    - LicenceKey: local-dev
+                      ShopId: 1
+                      Marketplace: ApiWeb
+              validateCredentialsInvalid:
+                summary: Simulated invalid OTTO credentials
+                value:
+                  Source: unicorn2
+                  Method: validateCredentials
+                  LicenceKey: local-dev
+                  ShopId: 1
+                  CreatedAtUtc: "2026-06-13T10:00:00Z"
+                  Reference: null
+                  Objects:
+                    - LicenceKey: local-dev
+                      ShopId: 1
+                      Marketplace: ApiWeb
+              stockUpdate:
+                summary: Stock update
+                value:
+                  Source: unicorn2
+                  Method: setStock
+                  LicenceKey: local-dev
+                  ShopId: 1
+                  CreatedAtUtc: "2026-06-13T10:00:00Z"
+                  Reference: null
+                  Objects:
+                    - ShopId: article-123
+                      ArtikelNummer: SKU-123
+                      Bestand: 12
+                      StockPolicy: true
+      responses:
+        "200":
+          description: Signed ApiWeb response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Answer'
+              examples:
+                validCredentials:
+                  summary: validateCredentials success
+                  value:
+                    Key: ""
+                    Stop: false
+                    Error: null
+                    Results:
+                      - Errors: []
+                        Collection: []
+                        Item:
+                          Valid: true
+                          Message: OTTO credentials are valid and shipping-profiles endpoint is reachable.
+                invalidCredentials:
+                  summary: validateCredentials unhappy path
+                  value:
+                    Key: ""
+                    Stop: false
+                    Error: null
+                    Results:
+                      - Errors: []
+                        Collection: []
+                        Item:
+                          Valid: false
+                          Message: OTTO rejected credentials or permissions. Check token, installation, app scopes and seller permissions.
+                quotaExceeded:
+                  summary: getOrders quota exceeded
+                  value:
+                    Key: ""
+                    Stop: false
+                    Error: null
+                    Results:
+                      - Errors:
+                          - Code: 429
+                            Message: OTTO quota/rate limit reached for endpoint orders. Retry later and reduce request frequency.
+                        Collection: []
+                        Item: null
+                apiDown:
+                  summary: getOrders API down
+                  value:
+                    Key: ""
+                    Stop: false
+                    Error: null
+                    Results:
+                      - Errors:
+                          - Code: 503
+                            Message: OTTO API is currently not reachable or returned a server error for endpoint orders. Retry later.
+                        Collection: []
+                        Item: null
+components:
+  schemas:
+    ApiWebMethod:
+      type: string
+      enum:
+        - validateCredentials
+        - getCapabilities
+        - addArticle
+        - setArticle
+        - delArticle
+        - setStock
+        - setPrice
+        - setProcessingTime
+        - addArticleCrossselling
+        - delArticleCrossselling
+        - addArticleAttribut
+        - setArticleAttribut
+        - delArticleAttribut
+        - addArticleImage
+        - setArticleImage
+        - delArticleImage
+        - addCategory
+        - setCategory
+        - delCategory
+        - addCategoryLink
+        - delCategoryLink
+        - getPortalCategories
+        - getOrders
+        - setOrderSend
+        - setOrderPaid
+        - setOrderCancelled
+        - setReturned
+        - getReturned
+        - getFulfillmentByMarketplaceWarehouse
+        - uploadInvoice
+        - uploadRefund
+        - uploadRefundData
+        - downloadInvoices
+        - downloadRefunds
+        - getShippingProfiles
+        - purge
+        - purgeArticles
+        - purgeCategories
+      x-minimal-sample-methods:
+        - validateCredentials
+        - getCapabilities
+        - getOrders
+        - setOrderSend
+        - setStock
+        - setPrice
+        - setProcessingTime
+    RequestEnvelope:
+      type: object
+      required:
+        - Source
+        - Method
+        - CreatedAtUtc
+        - Objects
+      properties:
+        Source:
+          type: string
+          enum: [unicorn2]
+        Method:
+          $ref: '#/components/schemas/ApiWebMethod'
+        LicenceKey:
+          type: string
+        ShopId:
+          type: integer
+          format: int64
+        CreatedAtUtc:
+          type: string
+          format: date-time
+        Reference:
+          type: object
+          nullable: true
+          description: Optional article context for relation operations.
+        Objects:
+          type: array
+          items:
+            type: object
+          description: >
+            The payload type depends on Method. For update methods Unicorn sends
+            one object per changed entity; the endpoint returns one Result per
+            object and must continue after per-object errors.
+    Answer:
+      type: object
+      properties:
+        Key:
+          type: string
+        Stop:
+          type: boolean
+        Error:
+          nullable: true
+          $ref: '#/components/schemas/Error'
+        Results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Result'
+    Result:
+      type: object
+      properties:
+        Errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/Error'
+        Item:
+          type: object
+          nullable: true
+        Collection:
+          type: array
+          items:
+            type: object
+    Error:
+      type: object
+      properties:
+        Code:
+          type: integer
+        Message:
+          type: string
+    Capabilities:
+      type: object
+      properties:
+        SupportedLanguages:
+          type: array
+          items:
+            type: string
+        SupportedWaehrungen:
+          type: array
+          items:
+            type: string
+        SupportedZahlungsarten:
+          type: array
+          items:
+            type: string
+        ShippingProfiles:
+          type: array
+          items:
+            type: string
+        Features:
+          type: array
+          items:
+            $ref: '#/components/schemas/Feature'
+    Feature:
+      type: string
+      enum:
+        - stockPolicy
+        - EmulatedVakos
+        - TeilVersand
+        - FulfillmentByMarketplace
+        - RetoureAnnouncementDownload
+        - PortalCategories
+        - NoBranding
+        - NoDummyText
+        - Purge
+        - InvoiceFileUpload
+        - InvoiceDataUpload
+        - RefundFileUpload
+        - RefundDataUpload
+        - RetoureUpload
+        - InvoiceFileDownload
+        - InvoiceDataDownload
+        - RefundFileDownload
+        - RefundDataDownload
+    StockUpdate:
+      type: object
+      properties:
+        ShopId:
+          type: string
+        ArtikelNummer:
+          type: string
+        Bestand:
+          type: number
+        StockPolicy:
+          type: boolean
+    PriceUpdate:
+      type: object
+      properties:
+        ShopId:
+          type: string
+        ArtikelNummer:
+          type: string
+        Preis:
+          type: number
+        Waehrung:
+          $ref: '#/components/schemas/Waehrung'
+    ProcessingTimeUpdate:
+      type: object
+      properties:
+        ShopId:
+          type: string
+        ArtikelNummer:
+          type: string
+        ProcessingTimeInDays:
+          type: integer
+        ShippingProfile:
+          type: string
+    Waehrung:
+      type: integer
+      format: int32
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41]
+      x-enumNames:
+        - EURO
+        - USDOLLAR
+        - POUND
+        - SWISSFRANC
+        - WIREURO
+        - WIRFRANC
+        - DANISHKRONE
+        - WON
+        - MEXPESO
+        - NORWEGIANKRONE
+        - ZLOTY
+        - ROMANIANLEU
+        - RUSSIANROUBLE
+        - LIRA
+        - FORINT
+        - YEN
+        - YUAN
+        - SWEDISHKRONA
+        - LEV
+        - CZECHKORUNA
+        - LITAS
+        - CROATIANKUNA
+        - AUSTRALIANDOLLAR
+        - BRASILIANREAL
+        - CANADIANDOLLAR
+        - HONGKONGDOLLAR
+        - INDONESIANRUPIAH
+        - SHEKEL
+        - INDIANRUPEE
+        - MALAYSIANRINGGIT
+        - NEWZEALANDDOLLAR
+        - PHILLIPINEPESO
+        - SINGAPOREDOLLAR
+        - BAHT
+        - RAND
+        - VAEDirham
+        - AFGHANI
+        - OSTKARIBISCHERDOLLAR
+        - LEK
+        - EGYPTPOUND
+        - SERBIANDINAR
+        - HRYWNA
+    Zahlungsart:
+      type: integer
+      format: int32
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78]
+      x-enumNames:
+        - Unbekannt
+        - Überweisung
+        - Vorkasse
+        - Lastschrift
+        - Kreditkarte
+        - SofortÜberweisung
+        - ClickAndBuy
+        - Rechnung
+        - PayPal
+        - GiroPay
+        - Klarna
+        - Nachnahme
+        - Barzahlung
+        - SkrillMoneybookers
+        - BillSafe
+        - Treuhandservice
+        - SieheAngebotsbeschreibung
+        - Gutschein
+        - Maestro
+        - iDeal
+        - EPS
+        - Przelewy24
+        - Mpass
+        - Yapital
+        - PayDirekt
+        - BarzahlenDe
+        - Rakuten
+        - Hood
+        - Auvito
+        - MeinPaket
+        - Shopgate
+        - SumoScout
+        - Hitmeister
+        - Ricardo
+        - DaWanda
+        - PayPalExpress
+        - Crowdfox
+        - Idealo
+        - Real
+        - DaWandaPortemonnaiePayPal
+        - DaWandaPortemonnaieSofortÜberweisung
+        - DaWandaPortemonnaieKreditkarte
+        - DaWandaPortemonnaieIDeal
+        - DaWandaPortemonnaiePrzelewy24
+        - AmazonPay
+        - Wish
+        - Cdiscount
+        - Etsy
+        - MoneyOrder
+        - Scheck
+        - ManoMano
+        - Check24
+        - Debit
+        - RicardoKreditkarteApplePayViaStripe
+        - Bol
+        - MetroMarkets
+        - Ratenzahlung
+        - InternationalMarketplaceNetwork
+        - IdealoDirektkaufPayment
+        - OttoMarket
+        - Rewe
+        - InternationalMarketplaceNetworkEPrice
+        - InternationalMarketplaceNetworkCDiscount
+        - InternationalMarketplaceNetworkEMag
+        - InternationalMarketplaceNetworkReal
+        - InternationalMarketplaceNetworkBol
+        - Wayfair
+        - Kaufland
+        - Breuninger
+        - RechnungRatenzahlung
+        - LastschriftRatenzahlung
+        - Ratepay
+        - HoodPay
+        - Plaza
+        - ApplePay
+        - GooglePay
+        - AndroidPay
+        - Amazon
+        - Temu
+    RetourState:
+      type: integer
+      format: int32
+      enum: [0, 1, 2, 3, 4, 5]
+      x-enumNames:
+        - Unknown
+        - Announced
+        - Shipped
+        - Arrived
+        - UnderReview
+        - Completed
+    StornoReason:
+      type: integer
+      format: int32
+      enum: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+      x-enumNames:
+        - LowStock
+        - CancelledByCustomer
+        - PaymentRefused
+        - LitigationSuspicion
+        - FraudSuspicion
+        - RefusedBySeller
+        - NoShipment
+        - NonPickedUpByCustomer
+        - AutomaticCancellation
+        - WrongPrice
+        - WrongProductData
+        - CustomerAgreement
+        - ShippingAddressUndeliverable
+        - CancelledByMarketplace
+        - DelayedInventory
+        - ProductExchange
+        - Undefined
+    GutschriftType:
+      type: integer
+      format: int32
+      enum: [0, 1, 2]
+      x-enumNames:
+        - Other
+        - Return
+        - Cancellation
