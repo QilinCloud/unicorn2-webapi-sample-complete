@@ -9,6 +9,8 @@ Public protocol documentation:
 - https://webservice.marcos-software.de/index.html
 - https://webservice.marcos-software.de/endpoints.html
 - https://webservice.marcos-software.de/samples.html
+- https://webservice.marcos-software.de/conformance.html
+- https://webservice.marcos-software.de/field-test-checklist.html
 - https://webservice.marcos-software.de/openapi.yaml
 
 ## What this sample contains
@@ -61,3 +63,18 @@ $env:APIWEB_FAILURE_MODE='getOrders:unknown'
 
 These modes return realistic ApiWeb failures so Unicorn can log useful messages
 without the endpoint process crashing.
+
+## Field-tested pitfalls
+
+- ApiWeb body hashes and HMAC signatures are Base64 encoded, not hex encoded.
+- Response signatures use transport marker `RESPONSE`.
+- Response `X-Unicorn-Api-Method` must be the original ApiWeb method, never
+  `response`.
+- Sign the exact raw JSON body that is sent over HTTP.
+- After FTP upload, verify the exact public URL to `api.php`; some hostings use
+  a subfolder.
+- Unsigned public calls to `api.php` should return a JSON `401`; `404` means
+  wrong path and `500` means PHP/server failure.
+- Protect `config.php`, `.env`, backups and logs from public download.
+- For write methods, resolve the marketplace offer/listing/unit id from
+  `ShopId`, SKU or EAN when the marketplace does not use the same identifier.

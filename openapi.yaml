@@ -22,7 +22,10 @@ paths:
       description: >
         Unicorn 2 always posts to one endpoint and selects the operation through
         `X-Unicorn-Api-Method` and the `Method` field in the JSON body. Every
-        request and response is signed with HMAC-SHA256.
+        request and response is signed with HMAC-SHA256. Body hashes and HMAC
+        signatures are Base64 encoded, not hex encoded. Response signatures use
+        the transport marker `RESPONSE` and keep `X-Unicorn-Api-Method` equal to
+        the original ApiWeb method.
       parameters:
         - name: X-Unicorn-Signature-Version
           in: header
@@ -49,11 +52,13 @@ paths:
         - name: X-Unicorn-Body-Sha256
           in: header
           required: true
+          description: Base64 encoded SHA-256 hash of the exact raw request or response body.
           schema:
             type: string
         - name: X-Unicorn-Signature
           in: header
           required: true
+          description: Base64 encoded HMAC-SHA256 over the six-line ApiWeb canonical string.
           schema:
             type: string
       requestBody:
@@ -243,6 +248,9 @@ components:
             The payload type depends on Method. For update methods Unicorn sends
             one object per changed entity; the endpoint returns one Result per
             object and must continue after per-object errors.
+            For write methods, resolve marketplace update ids from
+            MarketplaceId, UnitId, ShopId, SKU, ArtikelNummer, EAN or GTIN when
+            the target marketplace requires a separate offer/listing/unit id.
     Answer:
       type: object
       properties:
